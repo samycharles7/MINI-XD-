@@ -1,0 +1,5 @@
+{
+  "name": "MINI-XD Pairing",
+  "description": "A mobile-first iOS style app for generating WhatsApp pairing codes.",
+  "requestFramePermissions": []
+}
