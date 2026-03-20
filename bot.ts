@@ -14,6 +14,7 @@ import fs from 'fs';
 import { Boom } from '@hapi/boom';
 import axios from 'axios';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
+import yts from 'yt-search';
 
 export class WhatsAppBot {
   public sock: WASocket | null = null;
@@ -351,10 +352,10 @@ export class WhatsAppBot {
         }
 
         const prefix = '.';
-        const command = text.toLowerCase().trim();
+        const command = text.split(' ')[0].toLowerCase().trim();
         const args = text.split(' ').slice(1);
 
-        if (command.startsWith(prefix + 'afk')) {
+        if (command === prefix + 'afk') {
           const reason = args.join(' ') || 'Pas de raison précise ✨';
           this.afk[sender] = { reason, time: Date.now() };
           await this.sock?.sendMessage(remoteJid, { text: `*🌸 AFK activé !* @${sender.split('@')[0]} est maintenant absent(e). ✨\n*🧚 Raison :* ${reason}`, mentions: [sender] }, { quoted: msg });
@@ -417,7 +418,7 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'weather')) {
+        if (command === prefix + 'weather') {
           const city = args.join(' ');
           if (!city) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Donne moi une ville. ✨` }, { quoted: msg });
           try {
@@ -430,7 +431,7 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'lyrics')) {
+        if (command === prefix + 'lyrics') {
           const song = args.join(' ');
           if (!song) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Donne moi le nom d'une chanson. ✨` }, { quoted: msg });
           try {
@@ -441,31 +442,74 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'google')) {
+        if (command === prefix + 'google') {
           const query = args.join(' ');
           if (!query) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Que veux-tu chercher ? ✨` }, { quoted: msg });
           const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
           await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD SEARCH 🌸*\n\n*🧚 Recherche :* ${query}\n*✨ Lien :* ${searchUrl}` }, { quoted: msg });
         }
 
-        if (command.startsWith(prefix + 'pinterest')) {
+        if (command === prefix + 'pinterest') {
           const query = args.join(' ');
           if (!query) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Que cherches-tu sur Pinterest ? ✨` }, { quoted: msg });
           const pinUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
           await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD PINTEREST 🌸*\n\n*🧚 Recherche :* ${query}\n*✨ Lien :* ${pinUrl}` }, { quoted: msg });
         }
 
-        if (command === prefix + 'news') {
+        if (command === prefix + 'wiki') {
+          const query = args.join(' ');
+          if (!query) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Que veux-tu chercher sur Wikipedia ? ✨` }, { quoted: msg });
           try {
-            const res = await axios.get('https://newsapi.org/v2/top-headlines?country=fr&apiKey=YOUR_API_KEY_HERE'); // This will fail without key, I'll use a mock or different API
-            // Using a simpler public API or simulation
-            await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD NEWS 🌸*\n\n*🧚 Actualités du moment :*\n1. Le bot MINI-XD est enfin en ligne ! ✨\n2. Samy Charles prépare de nouvelles surprises. 🎀\n3. La communauté s'agrandit de jour en jour. 🧚` }, { quoted: msg });
+            const res = await axios.get(`https://fr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+            const data = res.data;
+            if (data.type === 'standard') {
+              const wikiText = `*🌸 WIKIPEDIA - ${data.title} 🌸*\n\n*🧚* ${data.extract} ✨\n\n*✨ Lien :* ${data.content_urls.mobile.page} 🎀`;
+              await this.sock?.sendMessage(remoteJid, { text: wikiText }, { quoted: msg });
+            } else {
+              await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Article non trouvé. ✨` }, { quoted: msg });
+            }
           } catch (e) {
-            await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD NEWS 🌸*\n\n*🧚 Actualités du moment :*\n1. Le bot MINI-XD est enfin en ligne ! ✨\n2. Samy Charles prépare de nouvelles surprises. 🎀\n3. La communauté s'agrandit de jour en jour. 🧚` }, { quoted: msg });
+            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Erreur lors de la recherche Wikipedia. ✨` }, { quoted: msg });
           }
         }
 
-        if (command.startsWith(prefix + 'reminder')) {
+        if (command === prefix + 'play') {
+          const query = args.join(' ');
+          if (!query) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Que veux-tu écouter ? ✨` }, { quoted: msg });
+          try {
+            const search = await yts(query);
+            const video = search.videos[0];
+            if (!video) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Vidéo non trouvée. ✨` }, { quoted: msg });
+            
+            const caption = `*🌸 MINI-XD PLAY 🌸*\n\n*🧚 Titre :* ${video.title}\n*✨ Durée :* ${video.timestamp}\n*🧚 Vues :* ${video.views}\n*✨ Lien :* ${video.url}\n\n*🧚 Téléchargement en cours... 🎀*`;
+            await this.sock?.sendMessage(remoteJid, { image: { url: video.thumbnail }, caption }, { quoted: msg });
+          } catch (e) {
+            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Erreur lors de la recherche. ✨` }, { quoted: msg });
+          }
+        }
+
+        if (command === prefix + 'ytmp3' || command === prefix + 'ytmp4') {
+          const url = args[0];
+          if (!url) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Donne moi un lien YouTube. ✨` }, { quoted: msg });
+          await this.sock?.sendMessage(remoteJid, { text: `*🌸 Téléchargement en cours...* ✨\n\n*🧚 Bientôt disponible avec une vraie API de téléchargement ! 🎀*` }, { quoted: msg });
+        }
+
+        if (command === prefix + 'news') {
+          try {
+            const res = await axios.get('https://api.spaceflightnewsapi.net/v4/articles/?limit=5');
+            const articles = res.data.results;
+            let newsText = `*╭─── 🌸 MINI-XD NEWS 🌸 ───╮*\n\n`;
+            articles.forEach((art: any, i: number) => {
+              newsText += `*${i + 1}.* ${art.title}\n*🧚 Source :* ${art.news_site}\n\n`;
+            });
+            newsText += `*╰──────────────────╯*`;
+            await this.sock?.sendMessage(remoteJid, { text: newsText }, { quoted: msg });
+          } catch (e) {
+            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Impossible de récupérer les actualités. ✨` }, { quoted: msg });
+          }
+        }
+
+        if (command === prefix + 'reminder') {
           const time = parseInt(args[0]);
           const reason = args.slice(1).join(' ') || 'Rappel ! ✨';
           if (isNaN(time)) return await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Utilise : .reminder [minutes] [raison] ✨` }, { quoted: msg });
@@ -477,10 +521,10 @@ export class WhatsAppBot {
           }, time * 60000);
         }
 
-        if (command.startsWith(prefix + 'ship')) {
+        if (command === prefix + 'ship') {
           const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
           if (users.length >= 2) {
-            const love = Math.floor(Math.random() * 100);
+            const love = Math.floor(Math.random() * 101);
             const user1 = users[0];
             const user2 = users[1];
             await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD SHIP 🌸*\n\n*🧚 @${user1.split('@')[0]}* ❤️ *🧚 @${user2.split('@')[0]}*\n*✨ Compatibilité :* ${love}% 💖`, mentions: [user1, user2] }, { quoted: msg });
@@ -489,10 +533,10 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'love')) {
+        if (command === prefix + 'love') {
           const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
           const target = users[0] || sender;
-          const love = Math.floor(Math.random() * 100);
+          const love = Math.floor(Math.random() * 101);
           await this.sock?.sendMessage(remoteJid, { text: `*🌸 MINI-XD LOVE 🌸*\n\n*🧚 @${target.split('@')[0]}* est amoureux(se) à ${love}% ! 💖`, mentions: [target] }, { quoted: msg });
         }
 
@@ -625,6 +669,10 @@ export class WhatsAppBot {
 *│* 🌸 ${prefix}ping
 *│* 🌸 ${prefix}speed
 *│* 🌸 ${prefix}translate
+*│* 🌸 ${prefix}wiki
+*│* 🌸 ${prefix}play
+*│* 🌸 ${prefix}ytmp3
+*│* 🌸 ${prefix}ytmp4
 *│* 🌸 ${prefix}groupinfo
 *│* 🌸 ${prefix}getpp
 *│* 🌸 ${prefix}admins
@@ -704,7 +752,7 @@ export class WhatsAppBot {
 
         // Moderation Commands (Group Only)
         if (isGroup) {
-          if (command.startsWith(prefix + 'antilink')) {
+          if (command === prefix + 'antilink') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antilinkGroups.add(remoteJid);
@@ -715,7 +763,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'antispam')) {
+          if (command === prefix + 'antispam') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antispamGroups.add(remoteJid);
@@ -726,7 +774,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'antidelete')) {
+          if (command === prefix + 'antidelete') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antidelete = true;
@@ -737,7 +785,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'antiviewonce')) {
+          if (command === prefix + 'antiviewonce') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antiviewonce = true;
@@ -748,7 +796,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'anticall')) {
+          if (command === prefix + 'anticall') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.anticall = true;
@@ -759,7 +807,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'antitoxic')) {
+          if (command === prefix + 'antitoxic') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antitoxic = true;
@@ -770,7 +818,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'antitag')) {
+          if (command === prefix + 'antitag') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.antitag = true;
@@ -781,7 +829,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'welcome')) {
+          if (command === prefix + 'welcome') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.welcomeGroups.add(remoteJid);
@@ -792,7 +840,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'goodbye')) {
+          if (command === prefix + 'goodbye') {
             const mode = args[0]?.toLowerCase();
             if (mode === 'on') {
               this.goodbyeGroups.add(remoteJid);
@@ -803,7 +851,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'kick')) {
+          if (command === prefix + 'kick') {
             const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
             if (users.length > 0) {
               await this.sock?.groupParticipantsUpdate(remoteJid, users, 'remove');
@@ -811,7 +859,7 @@ export class WhatsAppBot {
             }
           }
 
-          if (command.startsWith(prefix + 'add')) {
+          if (command === prefix + 'add') {
             const number = args[0]?.replace(/[^0-9]/g, '');
             if (number) {
               await this.sock?.groupParticipantsUpdate(remoteJid, [`${number}@s.whatsapp.net`], 'add');
@@ -1037,9 +1085,25 @@ export class WhatsAppBot {
             }
           }
 
-          if (command === prefix + 'setpp') {
-            // This requires handling media download, for now we'll acknowledge the command
-            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oh !* J'aimerais beaucoup changer la photo, mais j'ai besoin que tu répondes à une image avec cette commande. ✨` }, { quoted: msg });
+          if (command === prefix + 'setpp' && isGroup && isAdmin) {
+            const contextInfo = msg.message.extendedTextMessage?.contextInfo;
+            const quoted = contextInfo?.quotedMessage;
+            if (quoted?.imageMessage) {
+              try {
+                const buffer = await downloadMediaMessage(
+                  { key: { remoteJid, id: contextInfo.stanzaId, participant: contextInfo.participant || remoteJid }, message: quoted } as any,
+                  'buffer',
+                  {},
+                  { logger: pino({ level: 'silent' }) } as any
+                );
+                await this.sock?.updateProfilePicture(remoteJid, buffer);
+                await this.sock?.sendMessage(remoteJid, { text: `*🌸 Photo de profil du groupe mise à jour ! ✨*` }, { quoted: msg });
+              } catch (e) {
+                await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Erreur lors de la mise à jour de la photo. ✨` }, { quoted: msg });
+              }
+            } else {
+              await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Réponds à une image avec cette commande pour changer la photo du groupe. 🎀` }, { quoted: msg });
+            }
           }
         }
 
@@ -1323,10 +1387,18 @@ export class WhatsAppBot {
           await this.sock?.sendMessage(remoteJid, { text: `*🌸 Vitesse :* ${end - start}ms ✨` }, { quoted: msg });
         }
 
-        if (command.startsWith(prefix + 'translate')) {
+        if (command === prefix + 'translate') {
           const query = args.join(' ');
           if (query) {
-            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Traduction (Simulation) :* ${query} ✨\n\n*🧚 Bientôt disponible avec une vraie API ! 🎀*` }, { quoted: msg });
+            try {
+              const res = await axios.get(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(query)}&langpair=auto|fr`);
+              const translation = res.data.responseData.translatedText;
+              await this.sock?.sendMessage(remoteJid, { text: `*🌸 TRADUCTION 🌸*\n\n*🧚 Texte :* ${query}\n*✨ Traduction :* ${translation} 🎀` }, { quoted: msg });
+            } catch (e) {
+              await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Erreur lors de la traduction. ✨` }, { quoted: msg });
+            }
+          } else {
+            await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Donne-moi un texte à traduire chéri(e). 🎀` }, { quoted: msg });
           }
         }
 
@@ -1363,19 +1435,24 @@ export class WhatsAppBot {
           await this.sock?.sendMessage(remoteJid, { text: info, mentions: [metadata?.owner || ''] }, { quoted: msg });
         }
 
-        if (command.startsWith(prefix + 'getpp')) {
-          const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-          const target = users[0] || sender;
+        if (command === prefix + 'getpp') {
+          const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
+          const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+          const target = mentioned || quoted || sender;
           try {
             const ppUrl = await this.sock?.profilePictureUrl(target, 'image');
             if (ppUrl) {
               await this.sock?.sendMessage(remoteJid, { image: { url: ppUrl }, caption: `*🌸 Voici la photo de profil ! ✨*` }, { quoted: msg });
             } else {
-              await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Pas de photo de profil trouvée. 🎀` }, { quoted: msg });
+              await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Pas de photo de profil trouvée (elle est peut-être privée). 🎀` }, { quoted: msg });
             }
           } catch (e) {
             await this.sock?.sendMessage(remoteJid, { text: `*🌸 Oups !* Impossible de récupérer la photo. ✨` }, { quoted: msg });
           }
+        }
+
+        if (command === prefix + 'goodbye' && isGroup && isAdmin) {
+          await this.sock?.sendMessage(remoteJid, { text: `*🌸 Au revoir tout le monde !* C'était un plaisir de vous avoir ici. ✨👋` }, { quoted: msg });
         }
 
         if (command === prefix + 'admins' && isGroup) {
@@ -1398,7 +1475,7 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'poll')) {
+        if (command === prefix + 'poll') {
           const parts = args.join(' ').split('|');
           if (parts.length >= 3) {
             const question = parts[0];
@@ -1415,7 +1492,7 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'block')) {
+        if (command === prefix + 'block') {
           const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
           if (users.length > 0) {
             await this.sock?.updateBlockStatus(users[0], 'block');
@@ -1423,7 +1500,7 @@ export class WhatsAppBot {
           }
         }
 
-        if (command.startsWith(prefix + 'unblock')) {
+        if (command === prefix + 'unblock') {
           const users = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
           if (users.length > 0) {
             await this.sock?.updateBlockStatus(users[0], 'unblock');
